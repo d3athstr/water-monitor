@@ -1,0 +1,63 @@
+---
+# PHASE 2 -- do not include until a filter/softener is installed.
+#
+# Single Atlas Scientific EZO-EC (K 1.0) behind a 3-way sample valve that
+# alternates raw / treated on a 15 minute cycle. Conductivity baselines
+# move over days, so simultaneous dual-probe measurement buys nothing and
+# costs an extra $230 plus a second calibration routine.
+#
+# Wiring: EZO-EC in I2C mode at 0x64 on the existing bus.
+# Sample valve on a spare GPIO via a relay.
+
+# ezo:
+#   - id: ec_probe
+#     address: 0x64
+#     unit_of_measurement: "uS/cm"
+#     name: "Conductivity Raw Reading"
+#     update_interval: 30s
+
+# globals:
+#   - id: sampling_treated
+#     type: bool
+#     restore_value: false
+#     initial_value: 'false'
+
+# switch:
+#   - platform: gpio
+#     pin: GPIO11
+#     id: sample_valve
+#     name: "Conductivity Sample Valve"
+#     # OFF = raw side, ON = treated side
+
+# sensor:
+#   - platform: template
+#     name: "Water Raw Conductivity"
+#     id: water_raw_conductivity
+#     unit_of_measurement: "uS/cm"
+#     state_class: measurement
+#   - platform: template
+#     name: "Water Treated Conductivity"
+#     id: water_treated_conductivity
+#     unit_of_measurement: "uS/cm"
+#     state_class: measurement
+#   - platform: template
+#     name: "Water Treatment Efficiency"
+#     unit_of_measurement: "%"
+#     state_class: measurement
+#     lambda: |-
+#       float feed = id(water_raw_conductivity).state;
+#       float prod = id(water_treated_conductivity).state;
+#       if (isnan(feed) || isnan(prod) || feed <= 0) return NAN;
+#       return (1.0f - (prod / feed)) * 100.0f;
+
+# interval:
+#   - interval: 15min
+#     then:
+#       - switch.toggle: sample_valve
+#       - delay: 3min        # purge the flow cell before trusting a reading
+#       - lambda: |-
+#           if (id(sample_valve).state) {
+#             id(water_treated_conductivity).publish_state(id(ec_probe).state);
+#           } else {
+#             id(water_raw_conductivity).publish_state(id(ec_probe).state);
+#           }

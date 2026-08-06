@@ -1,0 +1,156 @@
+---
+# Home Assistant package for the whole-house water monitor.
+# Drop in config/packages/ and add to configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+
+utility_meter:
+  water_daily:
+    source: sensor.water_monitor_water_total_gallons
+    name: Water Daily Gallons
+    cycle: daily
+  water_monthly:
+    source: sensor.water_monitor_water_total_gallons
+    name: Water Monthly Gallons
+    cycle: monthly
+
+input_boolean:
+  water_alerts_suppressed:
+    name: Water Alerts Suppressed
+    icon: mdi:bell-off
+  irrigation_running:
+    name: Irrigation Running
+    icon: mdi:sprinkler
+
+sensor:
+  # 30-day baseline for anomaly comparison.
+  - platform: statistics
+    name: Water Daily Gallons Baseline
+    unique_id: water_daily_gallons_baseline
+    entity_id: sensor.water_daily_gallons
+    state_characteristic: mean
+    max_age:
+      days: 30
+    sampling_size: 60
+
+  # Static pressure trend -- catches a PRV drifting out of adjustment.
+  - platform: statistics
+    name: Water Static Pressure 7d Mean
+    unique_id: water_static_pressure_7d_mean
+    entity_id: sensor.water_monitor_water_pressure_inlet
+    state_characteristic: mean
+    max_age:
+      days: 7
+    sampling_size: 2000
+
+template:
+  - binary_sensor:
+      - name: Water Continuous Flow
+        unique_id: water_continuous_flow
+        device_class: problem
+        state: >
+          {{ states('sensor.water_monitor_water_flow_rate') | float(0) > 0.1 }}
+        delay_on:
+          minutes: 30
+        delay_off:
+          minutes: 2
+
+automation:
+  - id: water_overnight_flow_alert
+    alias: "Water: overnight flow detected"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.water_monitor_water_flow_rate
+        above: 0.05
+        for: "00:15:00"
+    condition:
+      - condition: time
+        after: "02:00:00"
+        before: "05:00:00"
+      - condition: state
+        entity_id: input_boolean.irrigation_running
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.water_alerts_suppressed
+        state: "off"
+    action:
+      - service: notify.family_phones
+        data:
+          title: "Water: continuous overnight flow"
+          message: >
+            {{ states('sensor.water_monitor_water_flow_rate') }} gal/min for 15+
+            minutes with no scheduled irrigation. Possible leak or running toilet.
+
+  - id: water_catastrophic_flow
+    alias: "Water: catastrophic flow"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.water_monitor_water_flow_rate
+        above: 12
+        for: "00:05:00"
+    action:
+      - service: notify.family_phones
+        data:
+          title: "WATER: very high flow"
+          message: >
+            {{ states('sensor.water_monitor_water_flow_rate') }} gal/min sustained
+            5 minutes. Check for a burst line.
+      # Phase 3: close the motorized main valve here.
+
+  - id: water_leak_detected
+    alias: "Water: leak sensor tripped"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.water_monitor_water_leak
+        to: "on"
+    action:
+      - service: notify.family_phones
+        data:
+          title: "WATER LEAK"
+          message: "Leak sensor tripped in the equipment area."
+
+  - id: water_prv_failure
+    alias: "Water: pressure out of range"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.water_monitor_water_pressure_inlet
+        above: 100
+        for: "00:02:00"
+      - platform: numeric_state
+        entity_id: sensor.water_monitor_water_pressure_inlet
+        below: 40
+        for: "00:10:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.water_alerts_suppressed
+        state: "off"
+    action:
+      - service: notify.family_phones
+        data:
+          title: "Water pressure out of range"
+          message: >
+            Inlet pressure {{ states('sensor.water_monitor_water_pressure_inlet') }}
+            psi. Check the PRV and expansion tank.
+
+  - id: water_thermal_expansion
+    alias: "Water: thermal expansion spike"
+    mode: single
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.water_monitor_water_pressure_inlet
+        above: 90
+    condition:
+      - condition: state
+        entity_id: binary_sensor.water_monitor_water_flowing
+        state: "off"
+    action:
+      - service: persistent_notification.create
+        data:
+          title: "Thermal expansion spike"
+          message: >
+            Pressure rose above 90 psi with no flow. The expansion tank has
+            likely lost its air charge.

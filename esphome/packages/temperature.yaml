@@ -1,0 +1,25 @@
+---
+# DS18B20 strapped to the pipe under insulation -- no wetted part.
+# Run once with the address commented out, read the log for the ROM code,
+# then pin it here so a second probe can be added later without ambiguity.
+
+sensor:
+  - platform: dallas_temp
+    # address: 0x1234567890abcdef
+    name: "Water Temperature"
+    id: water_temperature
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 60s
+
+binary_sensor:
+  - platform: template
+    name: "Water Freeze Risk"
+    device_class: cold
+    lambda: |-
+      float t = id(water_temperature).state;
+      if (isnan(t)) return {};
+      return t < 4.5f;   # ~40 F
+    filters:
+      - delayed_on: 300s

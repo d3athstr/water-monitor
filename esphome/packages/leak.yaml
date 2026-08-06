@@ -1,0 +1,56 @@
+---
+# Rope leak sensors, dry contact to GND.
+# The buzzer fires from a local automation so it works with Home Assistant
+# offline. Do not move this logic into HA.
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: ${pin_leak_1}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Water Leak Equipment Area"
+    id: leak_1
+    device_class: moisture
+    filters:
+      - delayed_on: 1s
+    on_press:
+      then:
+        - switch.turn_on: leak_buzzer
+    on_release:
+      then:
+        - switch.turn_off: leak_buzzer
+
+  - platform: gpio
+    pin:
+      number: ${pin_leak_2}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Water Leak Heater Pan"
+    id: leak_2
+    device_class: moisture
+    filters:
+      - delayed_on: 1s
+    on_press:
+      then:
+        - switch.turn_on: leak_buzzer
+    on_release:
+      then:
+        - switch.turn_off: leak_buzzer
+
+  - platform: template
+    name: "Water Leak"
+    device_class: moisture
+    lambda: 'return id(leak_1).state || id(leak_2).state;'
+
+switch:
+  - platform: gpio
+    pin: ${pin_buzzer}
+    id: leak_buzzer
+    name: "Leak Buzzer"
+    entity_category: config
+    restore_mode: ALWAYS_OFF

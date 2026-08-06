@@ -1,0 +1,93 @@
+---
+# Inlet pressure (P1) on ADS1115 A0.
+# Phase 2: outlet pressure (P2) on A1 + differential -- commented below.
+#
+# Transducer: 0-100 psi ratiometric, 0.5 V @ 0 psi, 4.5 V @ 100 psi.
+# psi = (V - 0.5) * 25
+
+sensor:
+  - platform: ads1115
+    ads1115_id: ads
+    multiplexer: A0_GND
+    gain: 6.144
+    id: p1_volts
+    name: "Inlet Pressure Voltage"
+    entity_category: diagnostic
+    internal: false
+    update_interval: 5s
+    accuracy_decimals: 4
+    filters:
+      - median:
+          window_size: 5
+          send_every: 2
+          send_first_at: 2
+
+  - platform: template
+    name: "Water Pressure Inlet"
+    id: water_pressure_inlet
+    unit_of_measurement: "psi"
+    device_class: pressure
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      float v = id(p1_volts).state;
+      if (isnan(v)) return NAN;
+      float psi = (v - 0.5f) * 25.0f;
+      if (psi < 0.0f) psi = 0.0f;
+      return psi;
+    filters:
+      - exponential_moving_average:
+          alpha: 0.3
+          send_every: 1
+
+  # Rolling maximum, used to spot PRV drift and thermal-expansion spikes.
+  - platform: copy
+    source_id: water_pressure_inlet
+    name: "Water Pressure 24h Max"
+    filters:
+      - max:
+          window_size: 8640   # 10 s samples over 24 h
+          send_every: 360
+
+binary_sensor:
+  - platform: template
+    name: "Water Pressure Abnormal"
+    device_class: problem
+    lambda: |-
+      float p = id(water_pressure_inlet).state;
+      if (isnan(p)) return {};
+      return (p > 80.0f || p < 40.0f);
+    filters:
+      - delayed_on: 60s
+      - delayed_off: 300s
+
+# --- Phase 2 ---------------------------------------------------------
+# sensor:
+#   - platform: ads1115
+#     ads1115_id: ads
+#     multiplexer: A1_GND
+#     gain: 6.144
+#     id: p2_volts
+#     internal: true
+#     update_interval: 5s
+#
+#   - platform: template
+#     name: "Water Pressure Outlet"
+#     id: water_pressure_outlet
+#     unit_of_measurement: "psi"
+#     device_class: pressure
+#     state_class: measurement
+#     accuracy_decimals: 1
+#     lambda: |-
+#       float v = id(p2_volts).state;
+#       if (isnan(v)) return NAN;
+#       return max(0.0f, (v - 0.5f) * 25.0f);
+#
+#   - platform: template
+#     name: "Water Filter Pressure Drop"
+#     unit_of_measurement: "psi"
+#     state_class: measurement
+#     accuracy_decimals: 1
+#     lambda: |-
+#       return id(water_pressure_inlet).state - id(water_pressure_outlet).state;

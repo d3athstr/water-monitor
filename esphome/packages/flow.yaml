@@ -1,0 +1,46 @@
+---
+# 1" full-port positive-displacement meter with pulse output.
+# Reed switch: internal pull-up, 100 ms filter for contact bounce.
+# Set ${pulses_per_gallon} in the main config to match the meter.
+
+sensor:
+  - platform: pulse_counter
+    pin:
+      number: ${pin_flow_pulse}
+      mode:
+        input: true
+        pullup: true
+    id: flow_pulses
+    name: "Water Flow Rate"
+    unit_of_measurement: "gal/min"
+    device_class: water
+    state_class: measurement
+    accuracy_decimals: 2
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+    internal_filter: 100ms
+    update_interval: 10s
+    filters:
+      # pulse_counter reports pulses/min -> gallons/min
+      - lambda: return x / ${pulses_per_gallon};
+    total:
+      name: "Water Total Gallons"
+      id: water_total_gallons
+      unit_of_measurement: "gal"
+      device_class: water
+      state_class: total_increasing
+      accuracy_decimals: 1
+      filters:
+        - lambda: return x / ${pulses_per_gallon};
+
+binary_sensor:
+  - platform: template
+    name: "Water Flowing"
+    id: water_flowing
+    device_class: moisture
+    lambda: |-
+      if (isnan(id(flow_pulses).state)) return {};
+      return id(flow_pulses).state > 0.05f;
+    filters:
+      - delayed_off: 30s

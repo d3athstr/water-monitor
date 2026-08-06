@@ -1,0 +1,108 @@
+---
+# Whole-House Water Monitoring Station
+# ESP32-S3-N16R8 -- VLAN 10 (IoT)
+#
+# Phase 1: inlet pressure, flow, temperature, leak detection
+# Phase 2 stubs live in packages/ and are commented out below.
+
+substitutions:
+  device_name: water-monitor
+  friendly_name: "Water Monitor"
+  # Pin map -- change here, not in the packages.
+  pin_i2c_sda: GPIO8
+  pin_i2c_scl: GPIO9
+  pin_flow_pulse: GPIO4
+  pin_onewire: GPIO5
+  pin_leak_1: GPIO6
+  pin_leak_2: GPIO7
+  pin_buzzer: GPIO10
+  # Meter calibration: pulses per gallon (check the meter register face).
+  pulses_per_gallon: "1.0"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Whole-house water monitoring -- mechanical room"
+  on_boot:
+    priority: -100
+    then:
+      - logger.log: "Water monitor booted"
+
+esp32:
+  board: esp32s3devkitc-1
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Static so inventory and firewall rules stay stable. Real addresses
+  # live in secrets.yaml (gitignored) -- see secrets.yaml.example.
+  manual_ip:
+    static_ip: !secret static_ip
+    gateway: !secret gateway
+    subnet: 255.255.255.0
+    dns1: !secret dns1
+  ap:
+    ssid: "${device_name} fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  local: true
+
+i2c:
+  sda: ${pin_i2c_sda}
+  scl: ${pin_i2c_scl}
+  scan: true
+  id: bus_a
+
+# ADS1115 is powered from the 5 V rail so the 0.5-4.5 V ratiometric
+# transducers can be read directly. Pull-ups on SDA/SCL go to 3.3 V.
+ads1115:
+  - address: 0x48
+    id: ads
+
+one_wire:
+  - platform: gpio
+    pin: ${pin_onewire}
+
+packages:
+  pressure: !include packages/pressure.yaml
+  flow: !include packages/flow.yaml
+  temperature: !include packages/temperature.yaml
+  leak: !include packages/leak.yaml
+  # --- Phase 2: uncomment when the filter goes in -------------------
+  # conductivity: !include packages/conductivity.yaml
+
+button:
+  - platform: restart
+    name: "Restart"
+    entity_category: config
+
+sensor:
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 120s
+    entity_category: diagnostic
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+    entity_category: diagnostic

@@ -1,0 +1,31 @@
+---
+title: Water
+views:
+  - title: Overview
+    cards:
+      - type: entities
+        title: Now
+        entities:
+          - entity: sensor.water_monitor_water_pressure_inlet
+          - entity: sensor.water_monitor_water_flow_rate
+          - entity: sensor.water_monitor_water_temperature
+          - entity: binary_sensor.water_monitor_water_flowing
+          - entity: binary_sensor.water_monitor_water_leak
+          - entity: binary_sensor.water_monitor_water_pressure_abnormal
+      - type: statistic
+        entity: sensor.water_daily_gallons
+        stat_type: change
+        period:
+          calendar:
+            period: day
+        name: Today
+      - type: history-graph
+        hours_to_show: 48
+        entities:
+          - sensor.water_monitor_water_pressure_inlet
+          - sensor.water_monitor_water_flow_rate
+      - type: entities
+        title: Controls
+        entities:
+          - input_boolean.water_alerts_suppressed
+          - input_boolean.irrigation_running
