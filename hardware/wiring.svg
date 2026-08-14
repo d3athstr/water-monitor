@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="595" viewBox="0 0 980 595" font-family="DejaVu Sans, Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="980" height="595" fill="#ffffff"/>
+<style>
+    .box   { fill:#f4f4f4; stroke:#333333; stroke-width:1.6; }
+    .mcu   { fill:#e6e6e6; stroke:#111111; stroke-width:2.2; }
+    .ghost { fill:#fbfbfb; stroke:#999999; stroke-width:1.4; stroke-dasharray:6 4; }
+    .t     { font-size:12px; fill:#111111; }
+    .tb    { font-size:13px; fill:#111111; font-weight:bold; }
+    .ts    { font-size:10.5px; fill:#555555; }
+    .wire  { stroke:#333333; stroke-width:1.8; fill:none; }
+    .wired { stroke:#999999; stroke-width:1.5; fill:none; stroke-dasharray:6 4; }
+    .lbl   { font-size:11px; fill:#222222; }
+    .warn  { font-size:10.5px; fill:#a03000; font-weight:bold; }
+    .title { font-size:17px; fill:#111111; font-weight:bold; }
+    .sub   { font-size:12px; fill:#555555; }
+</style>
+<text x="24" y="34" class="title">Whole-House Water Monitor — wiring</text>
+<text x="24" y="55" class="sub">ESP32-S3 + ADS1115. The ADC lives on the 5 V rail so it reads a ratiometric 0.5–4.5 V transducer directly, with no divider.</text>
+<rect x="60" y="222" width="330" height="130" rx="4" class="mcu"/>
+<text x="225" y="252" class="tb" text-anchor="middle">ESP32-S3-N16R8</text>
+<text x="225" y="274" class="t" text-anchor="middle">I²C: SDA GPIO8 · SCL GPIO9</text>
+<text x="225" y="293" class="ts" text-anchor="middle">flow GPIO4 · 1-Wire GPIO5</text>
+<text x="225" y="312" class="ts" text-anchor="middle">leak GPIO6 / GPIO7 · buzzer GPIO10</text>
+<rect x="560" y="100" width="380" height="87" rx="4" class="box"/>
+<text x="750" y="124" class="tb" text-anchor="middle">ADS1115  @ 0x48  (16-bit ADC)</text>
+<text x="750" y="144" class="ts" text-anchor="middle">A0 = inlet pressure P1 · gain 6.144</text>
+<text x="750" y="161" class="ts" text-anchor="middle">0–100 psi ratiometric, 0.5 V @ 0 psi, 4.5 V @ 100</text>
+<text x="750" y="178" class="ts" text-anchor="middle">psi = (V − 0.5) × 25 · phase 2 adds P2 on A1</text>
+<path d="M390 287 L430 287 L430 143 L560 143" class="wire"/>
+<text x="436" y="137" class="lbl">I2C 0x48</text>
+<rect x="560" y="209" width="380" height="74" rx="4" class="box"/>
+<text x="750" y="233" class="tb" text-anchor="middle">Flow meter  (pulse output)</text>
+<text x="750" y="253" class="ts" text-anchor="middle">pulse_counter on GPIO4</text>
+<path d="M390 287 L444 287 L444 246 L560 246" class="wire"/>
+<text x="450" y="240" class="lbl">PULSE → GPIO4</text>
+<rect x="560" y="305" width="380" height="74" rx="4" class="box"/>
+<text x="750" y="329" class="tb" text-anchor="middle">DS18B20 temperature  (1-Wire)</text>
+<text x="750" y="349" class="ts" text-anchor="middle">dallas_temp on GPIO5</text>
+<path d="M390 287 L458 287 L458 342 L560 342" class="wire"/>
+<text x="464" y="336" class="lbl">OW → GPIO5</text>
+<rect x="560" y="401" width="380" height="74" rx="4" class="box"/>
+<text x="750" y="425" class="tb" text-anchor="middle">Leak sensors ×2  +  buzzer</text>
+<text x="750" y="445" class="ts" text-anchor="middle">leak 1 → GPIO6 · leak 2 → GPIO7</text>
+<text x="750" y="462" class="ts" text-anchor="middle">buzzer → GPIO10</text>
+<path d="M390 287 L472 287 L472 438 L560 438" class="wire"/>
+<text x="478" y="432" class="lbl">GPIO6/7/10</text>
+<text x="24" y="545" class="ts">Site addressing is deliberately absent from this repo — the ESPHome manual_ip block reads from !secret. Keep it that way.</text>
+<text x="24" y="565" class="ts">Conductivity is scoped but commented out in the firmware; it needs a sample valve on a spare GPIO via a relay.</text>
+</svg>
